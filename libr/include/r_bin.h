@@ -1036,6 +1036,7 @@ extern RBinPlugin r_bin_plugin_pcap;
 extern RBinPlugin r_bin_plugin_uf2;
 extern RBinPlugin r_bin_plugin_io;
 extern RBinPlugin r_bin_plugin_pef;
+extern RBinPlugin r_bin_plugin_mdt;
 
 #ifdef __cplusplus
 }

@@ -36,6 +36,7 @@ r_bin_sources = [
   'p/bin_mach0.c',
   'p/bin_mach064.c',
   'p/bin_mbn.c',
+  'p/bin_mdt.c',
   'p/bin_mdmp.c',
   'p/bin_menuet.c',
   'p/bin_mz.c',
@@ -102,6 +103,7 @@ r_bin_sources = [
   'format/mdmp/mdmp.c',
   'format/mdmp/mdmp_pe.c',
   'format/mdmp/mdmp_pe64.c',
+  'format/mdt/mdt.c',
   'format/le/le.c',
   'format/ne/ne.c',
   'format/mz/mz.c',
@@ -139,7 +141,7 @@ r_bin_sources = [
   'mangling/msvc.c',
   'mangling/objc.c',
   'mangling/swift-sd.c',
-  'mangling/swift.c'
+  'mangling/swift.c',
 ]
 
 if bin_plugins.contains('pyc') or bin_plugins.contains('pickle')
