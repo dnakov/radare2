@@ -1,1 +1,47 @@
-// SPDX-FileCopyrightText: 2025 Rot127 <unisono@quyllur.org>\n// SPDX-License-Identifier: LGPL-3.0-only\n\n/**\n * \\file Loader for the Qualcomm peripheral firmware images.\n *\n * Reference: https://github.com/torvalds/linux/blob/master/drivers/soc/qcom/mdt_loader.c\n */\n\n#ifndef R_BIN_MDT_H\n#define R_BIN_MDT_H\n\n#include <r_bin.h>\n#include <r_util.h>\n#include "../elf/elf.h"\n\n// Qualcomm-specific p_flags in ELF segment headers\n#define QCOM_MDT_TYPE_MASK      0x7000000\n#define QCOM_MDT_TYPE_LAYOUT    0x0000000\n#define QCOM_MDT_TYPE_SIGNATURE 0x2000000\n#define QCOM_MDT_RELOCATABLE    0x10000000\n\n// Missing in radare2 but used in original code\n#define R_BIN_ELF_TINY_SIZE     52\n\n/**\n * \\brief The segment type/p_type as it is in the ELF.\n */\ntypedef ut32 RBinMdtPFlags;\n\ntypedef enum r_bin_mdt_seg_type {\n\tR_BIN_MDT_PART_UNIDENTIFIED = 0,\n\tR_BIN_MDT_PART_ELF, ///< An ELF file.\n\tR_BIN_MDT_PART_MBN, ///< The secure boot authentication signature segment.\n\tR_BIN_MDT_PART_COMPRESSED_Q6ZIP, ///< Q6ZIP compressed segment (if identified).\n\tR_BIN_MDT_PART_COMPRESSED_CLADE2, ///< CLADE2 compressed segment (if identified).\n\tR_BIN_MDT_PART_COMPRESSED_ZLIB, ///< Zlib compressed segment (if identified).\n} RBinMdtSegBinFormat;\n\n// Forward declarations\ntypedef struct sbl_header SblHeader;\ntypedef struct r_bin_virtual_file_t RBinVirtualFile;\n\n/**\n * \\brief Simple virtual file structure for radare2\n */\ntypedef struct r_bin_virtual_file_t {\n\tchar *name;\n\tRBuffer *buf;\n\tbool buf_owned;\n} RBinVirtualFile;\n\n/**\n * \\brief An MDT firmware part and some descriptions.\n */\ntypedef struct r_bin_mdt_part_t {\n\tchar *name; ///< The name of the part. Should be equal to the base name of the file.\n\tbool relocatable; ///< True if the Qualcomm relocatable flag is set for the segment.\n\tbool is_layout; ///< True if the ELF segment is the firmware layout.\n\tRBinMdtSegBinFormat format; ///< The segment type.\n\tRBinMdtPFlags pflags; ///< The segment p_flags.\n\tRBinVirtualFile *vfile; ///< The virtual file for the `.bNN` file.\n\tunion {\n\t\tstruct r_bin_elf_obj_t *elf; ///< Set if this part is an ELF.\n\t\tSblHeader *mbn; ///< Set if this part is an MBN auth segment.\n\t} obj;\n\tRBinAddr *entry; ///< The entry point, if any.\n\tRBinMap *map; ///< The mapping of the part in memory.\n\t/**\n\t * \\brief The physical address as in the layout. This is not the same as map->addr!\n\t * Because map is used to read from the files. So it has be zero (to not mess up the reading offsets).\n\t */\n\tut64 paddr;\n\tchar *patches_vfile_name; ///< Name of the vfile of patches to the binary. If NULL, no patches are supported.\n\tchar *relocs_vfile_name; ///< Name of the vfile of relocs to the binary. If NULL, no relocs are supported.\n\tRList *symbols; ///< Symbols in this part.\n\tRList *relocs; ///< Relocs in this part.\n\tRList *sections; ///< Sections in this part.\n\tRList *sub_maps; ///< Maps of the obj, if any.\n} RBinMdtPart;\n\ntypedef struct r_bin_mdt_obj_t {\n\tchar *name; ///< The name of the peripheral firmware. E.g. modem, adsp, cdsp or npu.\n\tstruct r_bin_elf_obj_t *header; ///< The ELF header of the whole firmware. From `<peripheral>.mdt`.\n\tRList *parts; ///< All parts from the `<peripheral>.bNN` files.\n} RBinMdtObj;\n\n// Function declarations\nR_IPI RBinMdtPart *r_bin_mdt_part_new(const char *name, size_t p_flags);\nR_IPI void r_bin_mdt_part_free(R_OWN R_NULLABLE RBinMdtPart *part);\nR_IPI RBinMdtObj *r_bin_mdt_obj_new(void);\nR_IPI void r_bin_mdt_obj_free(RBinMdtObj *obj);\nR_IPI bool r_bin_mdt_check_filename(const char *filename);\nR_IPI bool r_bin_mdt_load_buffer(RBinFile *bf, R_OUT RBinObject *obj, RBuffer *buf, R_UNUSED Sdb *sdb);\nR_IPI bool r_bin_mdt_check_buffer(RBuffer *b);\nR_IPI void r_bin_mdt_destroy(RBinFile *bf);\nR_IPI R_OWN RList /*<RBinVirtualFile>*/ *r_bin_mdt_virtual_files(RBinFile *bf);\nR_IPI R_OWN RList /*<RBinMap>*/ *r_bin_mdt_get_maps(RBinFile *bf);\nR_IPI R_OWN RList /*<RBinAddr>*/ *r_bin_mdt_get_entry_points(RBinFile *bf);\nR_IPI R_OWN RList /*<RBinSymbol>*/ *r_bin_mdt_symbols(RBinFile *bf);\nR_IPI R_OWN RList /*<RBinSection>*/ *r_bin_mdt_sections(RBinFile *bf);\nR_IPI R_OWN RList /*<RBinReloc>*/ *r_bin_mdt_relocs(RBinFile *bf);\nR_IPI void r_bin_mdt_print_header(RBinFile *bf);\n\n// Helper functions\nR_IPI RBinVirtualFile *r_bin_virtual_file_new(const char *name, RBuffer *buf, bool buf_owned);\nR_IPI void r_bin_virtual_file_free(RBinVirtualFile *vfile);\nR_IPI RBinVirtualFile *r_bin_virtual_file_clone(RBinVirtualFile *vfile);\n\n// Helper function prototypes (now implemented)\nR_IPI bool mbn_read_sbl_header(RBuffer *buf, SblHeader *h, ut64 *offset);\nR_IPI void mbn_destroy_obj(SblHeader *h);\nR_IPI void mbn_header_obj(SblHeader *h, PrintfCallback cb_printf);\nR_IPI ut64 elf_reloc_targets_vfile_size(struct r_bin_elf_obj_t *elf);\nR_IPI ut32 qcom_p_flags(ut32 pflags);\nR_IPI R_OWN RList *patched_maps_elf_only(struct r_bin_elf_obj_t *elf, ut64 psize, RBuffer *buf, ut64 vaddr, const char *pname, const char *rname);\nR_IPI R_OWN RList *elf_symbols_obj(struct r_bin_elf_obj_t *elf);\nR_IPI R_OWN RList *elf_sections_obj(struct r_bin_elf_obj_t *elf, ut64 psize);\nR_IPI R_OWN RList *elf_relocs_obj(struct r_bin_elf_obj_t *elf, ut64 vaddr, RBuffer *patched_buf);\n\n#endif // R_BIN_MDT_H
+// mdt.h
+// SPDX-FileCopyrightText: 2025 Rot127 <unisono@quyllur.org>
+// SPDX-License-Identifier: LGPL-3.0-only
+
+#ifndef R_BIN_MDT_H
+#define R_BIN_MDT_H
+
+#include <r_bin.h>
+#include <r_util.h>
+
+// Qualcomm-specific p_flags in ELF segment headers
+#define QCOM_MDT_TYPE_MASK      0x7000000
+#define QCOM_MDT_TYPE_LAYOUT    0x0000000
+#define QCOM_MDT_TYPE_SIGNATURE 0x2000000
+#define QCOM_MDT_RELOCATABLE    0x10000000
+
+// Missing in radare2 but used in original code
+#define R_BIN_ELF_TINY_SIZE     52
+
+typedef enum {
+	R_BIN_MDT_PART_UNIDENTIFIED = 0,
+	R_BIN_MDT_PART_ELF,
+	R_BIN_MDT_PART_MBN,
+	R_BIN_MDT_PART_COMPRESSED_Q6ZIP,
+	R_BIN_MDT_PART_COMPRESSED_CLADE2,
+	R_BIN_MDT_PART_COMPRESSED_ZLIB,
+} RBinMdtPartFormat;
+
+typedef struct r_bin_mdt_obj_t {
+	char *name;
+	void *header;  // ELF header
+	RList *parts;
+} RBinMdtObj;
+
+// Function declarations
+R_API bool r_bin_mdt_check_buffer(RBuffer *b);
+R_API bool r_bin_mdt_load_buffer(RBinFile *bf, RBinObject *obj, RBuffer *buf, Sdb *sdb);
+R_API void r_bin_mdt_destroy(RBinFile *bf);
+R_API RList *r_bin_mdt_virtual_files(RBinFile *bf);
+R_API RList *r_bin_mdt_get_maps(RBinFile *bf);
+R_API RList *r_bin_mdt_get_entry_points(RBinFile *bf);
+R_API RList *r_bin_mdt_symbols(RBinFile *bf);
+R_API RList *r_bin_mdt_sections(RBinFile *bf);
+R_API RList *r_bin_mdt_relocs(RBinFile *bf);
+R_API void r_bin_mdt_print_header(RBinFile *bf);
+
+#endif

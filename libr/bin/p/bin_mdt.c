@@ -1,1 +1,97 @@
-// SPDX-FileCopyrightText: 2025 Rot127 <unisono@quyllur.org>\n// SPDX-License-Identifier: LGPL-3.0-only\n\n#include <r_bin.h>\n#include \"../format/mdt/mdt.h\"\n\nstatic RBinInfo *mdt_info(RBinFile *bf) {\n\tRBinInfo *ret = R_NEW0(RBinInfo);\n\tif (!ret) {\n\t\treturn NULL;\n\t}\n\tRBinMdtObj *mdt = bf->bo->bin_obj;\n\tret->lang = \"\";\n\tret->file = bf->file ? strdup(bf->file) : NULL;\n\tret->type = strdup(\"mdt\");\n\tret->has_pi = 0;\n\tret->has_canary = 0;\n\tret->has_retguard = -1;\n\tret->big_endian = Elf_(is_big_endian)(mdt->header);\n\tret->has_va = Elf_(has_va)(mdt->header);\n\tret->has_nx = Elf_(has_nx)(mdt->header);\n\tret->intrp = Elf_(get_intrp)(mdt->header);\n\tret->compiler = Elf_(get_compiler)(mdt->header);\n\tret->dbg_info = 0;\n\tret->bits = 32;\n\tret->arch = Elf_(get_arch)(mdt->header);\n\tret->cpu = Elf_(get_cpu)(mdt->header);\n\tret->machine = Elf_(get_machine_name)(mdt->header);\n\treturn ret;\n}\n\nstatic bool check_filename(RBinFile *bf) {\n\treturn r_bin_mdt_check_filename(bf->file);\n}\n\nstatic bool load_buffer(RBinFile *bf, RBuffer *buf, ut64 laddr) {\n\tif (!bf || !bf->bo) {\n\t\treturn false;\n\t}\n\treturn r_bin_mdt_load_buffer(bf, bf->bo, buf, NULL);\n}\n\nstatic bool check_buffer(RBinFile *bf, RBuffer *buf) {\n\treturn r_bin_mdt_check_buffer(buf);\n}\n\nstatic void destroy(RBinFile *bf) {\n\tr_bin_mdt_destroy(bf);\n}\n\nstatic RList *maps(RBinFile *bf) {\n\treturn r_bin_mdt_get_maps(bf);\n}\n\nstatic RList *entries(RBinFile *bf) {\n\treturn r_bin_mdt_get_entry_points(bf);\n}\n\nstatic RList *virtual_files(RBinFile *bf) {\n\treturn r_bin_mdt_virtual_files(bf);\n}\n\nstatic RList *symbols(RBinFile *bf) {\n\treturn r_bin_mdt_symbols(bf);\n}\n\nstatic RList *sections(RBinFile *bf) {\n\treturn r_bin_mdt_sections(bf);\n}\n\nstatic RList *relocs(RBinFile *bf) {\n\treturn r_bin_mdt_relocs(bf);\n}\n\nstatic void header(RBinFile *bf) {\n\tr_bin_mdt_print_header(bf);\n}\n\nRBinPlugin r_bin_plugin_mdt = {\n\t.meta = {\n\t\t.name = \"mdt\",\n\t\t.desc = \"Qualcomm Peripheral Image Loader (32bit only)\",\n\t\t.author = \"Rot127\",\n\t\t.license = \"LGPL-3.0-only\",\n\t},\n\t.check_filename = &check_filename,\n\t.load = &load_buffer,\n\t.info = &mdt_info,\n\t.header = &header,\n\t.maps = &maps,\n\t.entries = &entries,\n\t.check = &check_buffer,\n\t.virtual_files = &virtual_files,\n\t.destroy = &destroy,\n\t.sections = &sections,\n\t.symbols = &symbols,\n\t.relocs = &relocs,\n};\n\n#ifndef R2_PLUGIN_INCORE\nR_API RLibStruct radare_plugin = {\n\t.type = R_LIB_TYPE_BIN,\n\t.data = &r_bin_plugin_mdt,\n\t.version = R2_VERSION\n};\n#endif"
+// SPDX-FileCopyrightText: 2025 Rot127 <unisono@quyllur.org>
+// SPDX-License-Identifier: LGPL-3.0-only
+
+#include <r_bin.h>
+#include "../format/mdt/mdt.h"
+
+static RBinInfo *info(RBinFile *bf) {
+	RBinInfo *ret = R_NEW0(RBinInfo);
+	if (!ret) {
+		return NULL;
+	}
+	ret->lang = "";
+	ret->file = bf->file ? strdup(bf->file) : NULL;
+	ret->type = strdup("mdt");
+	ret->bclass = strdup("firmware");
+	ret->rclass = strdup("mdt");
+	ret->os = strdup("Qualcomm");
+	ret->arch = strdup("hexagon");
+	ret->machine = strdup("Qualcomm Hexagon");
+	ret->subsystem = strdup("mdt");
+	ret->has_pi = 0;
+	ret->has_canary = 0;
+	ret->has_retguard = -1;
+	ret->big_endian = 0;
+	ret->has_va = 1;
+	ret->has_nx = 0;
+	ret->dbg_info = 0;
+	ret->bits = 32;
+	ret->has_crypto = false;
+	return ret;
+}
+
+static bool load(RBinFile *bf, RBuffer *buf, ut64 laddr) {
+	if (!bf || !bf->bo) {
+		return false;
+	}
+	return r_bin_mdt_load_buffer(bf, bf->bo, buf, NULL);
+}
+
+static bool check(RBinFile *bf, RBuffer *buf) {
+	return r_bin_mdt_check_buffer(buf);
+}
+
+static void destroy(RBinFile *bf) {
+	r_bin_mdt_destroy(bf);
+}
+
+static RList *maps(RBinFile *bf) {
+	return r_bin_mdt_get_maps(bf);
+}
+
+static RList *entries(RBinFile *bf) {
+	return r_bin_mdt_get_entry_points(bf);
+}
+
+static RList *symbols(RBinFile *bf) {
+	return r_bin_mdt_symbols(bf);
+}
+
+static RList *sections(RBinFile *bf) {
+	return r_bin_mdt_sections(bf);
+}
+
+static RList *relocs(RBinFile *bf) {
+	return r_bin_mdt_relocs(bf);
+}
+
+static void header(RBinFile *bf) {
+	r_bin_mdt_print_header(bf);
+}
+
+RBinPlugin r_bin_plugin_mdt = {
+	.meta = {
+		.name = "mdt",
+		.desc = "Qualcomm Peripheral Image Loader (32bit only)",
+		.author = "Rot127",
+		.license = "LGPL-3.0-only",
+	},
+	.load = &load,
+	.info = &info,
+	.header = &header,
+	.maps = &maps,
+	.entries = &entries,
+	.check = &check,
+	.destroy = &destroy,
+	.sections = &sections,
+	.symbols = &symbols,
+	.relocs = &relocs,
+};
+
+#ifndef R2_PLUGIN_INCORE
+R_API RLibStruct radare_plugin = {
+	.type = R_LIB_TYPE_BIN,
+	.data = &r_bin_plugin_mdt,
+	.version = R2_VERSION
+};
+#endif
