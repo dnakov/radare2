@@ -1,103 +1,59 @@
-/* radare2 - LGPL - Copyright 2024 - User */
+// SPDX-FileCopyrightText: 2025 Rot127 <unisono@quyllur.org>
+// SPDX-License-Identifier: LGPL-3.0-only
 
-#include <r_types.h>
-#include <r_util.h>
-#include <r_lib.h>
 #include <r_bin.h>
 #include "../format/mdt/mdt.h"
 
-static bool check(RBinFile *bf, RBuffer *b) {
-	R_RETURN_VAL_IF_FAIL (b, false);
-	return r_bin_mdt_check (b);
-}
-
-static bool load(RBinFile *bf, RBuffer *b, ut64 loadaddr) {
-	RBinMdtObj *obj = r_bin_mdt_new_buf (b);
-	if (!obj) {
-		return false;
+static RBinInfo *mdt_info(RBinFile *bf) {
+	RBinInfo *ret = R_NEW0(RBinInfo);
+	if (!ret) {
+		return NULL;
 	}
-	bf->bo->bin_obj = obj;
-	return true;
+	RBinMdtObj *mdt = bf->bo->bin_obj;
+	ret->lang = "";
+	ret->file = bf->file ? strdup(bf->file) : NULL;
+	ret->type = strdup("mdt");
+	ret->has_pi = 0;
+	ret->has_canary = 0;
+	ret->has_retguard = -1;
+	ret->big_endian = Elf32_rz_bin_elf_is_big_endian(mdt->header);
+	ret->has_va = Elf32_rz_bin_elf_has_va(mdt->header);
+	ret->has_nx = Elf32_rz_bin_elf_has_nx(mdt->header);
+	ret->intrp = Elf32_rz_bin_elf_get_intrp(mdt->header);
+	ret->compiler = Elf32_rz_bin_elf_get_compiler(mdt->header);
+	ret->dbg_info = 0;
+	ret->bits = 32;
+	ret->arch = Elf32_rz_bin_elf_get_arch(mdt->header);
+	ret->cpu = Elf32_rz_bin_elf_get_cpu(mdt->header);
+	ret->machine = Elf32_rz_bin_elf_get_machine_name(mdt->header);
+	return ret;
 }
 
-static void destroy(RBinFile *bf) {
-	if (bf && bf->bo && bf->bo->bin_obj) {
-		r_bin_mdt_free ((RBinMdtObj *)bf->bo->bin_obj);
-		bf->bo->bin_obj = NULL;
-	}
+static bool mdt_check(RBinFile *bf, RBuffer *buf) {
+	return r_bin_mdt_check_buffer(buf);
 }
 
-static ut64 baddr(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_baddr (obj) : 0;
-}
-
-static RList *entries(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_entries (obj) : NULL;
-}
-
-static RList *sections(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_sections (obj) : NULL;
-}
-
-static RList *symbols(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_symbols (obj) : NULL;
-}
-
-static RList *imports(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_imports (obj) : NULL;
-}
-
-static RList *libs(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_libs (obj) : NULL;
-}
-
-static RList *relocs(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_relocs (obj) : NULL;
-}
-
-static RBinInfo *info(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_info (obj) : NULL;
-}
-
-static ut64 size(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_size (obj) : 0;
-}
-
-static RList *maps(RBinFile *bf) {
-	RBinMdtObj *obj = bf->bo->bin_obj;
-	return obj ? r_bin_mdt_get_maps (obj) : NULL;
+static bool mdt_load(RBinFile *bf, RBuffer *buf, ut64 laddr) {
+	return r_bin_mdt_load_buffer(bf, bf->bo, buf, NULL);
 }
 
 RBinPlugin r_bin_plugin_mdt = {
 	.meta = {
 		.name = "mdt",
-		.desc = "Qualcomm peripheral firmware images loader",
-		.author = "User",
-		.license = "LGPL-3.0-only",
+		.desc = "Qualcomm Peripheral Image Loader (32bit only)",
+		.author = "Rot127",
+		.license = "LGPL3",
 	},
-	.load = &load,
-	.destroy = &destroy,
-	.check = &check,
-	.baddr = &baddr,
-	.entries = &entries,
-	.sections = &sections,
-	.symbols = &symbols,
-	.imports = &imports,
-	.libs = &libs,
-	.relocs = &relocs,
-	.info = &info,
-	.size = &size,
-	.maps = &maps,
-	.minstrlen = 10,
+	.load = &mdt_load,
+	.info = &mdt_info,
+	.header = &r_bin_mdt_print_header,
+	.maps = &r_bin_mdt_get_maps,
+	.entries = &r_bin_mdt_get_entry_points,
+	.check = &mdt_check,
+	.destroy = &r_bin_mdt_destroy,
+	.sections = &r_bin_mdt_sections,
+	.symbols = &r_bin_mdt_symbols,
+	.relocs = &r_bin_mdt_relocs,
 };
 
 #ifndef R2_PLUGIN_INCORE
